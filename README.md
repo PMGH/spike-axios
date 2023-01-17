@@ -22,17 +22,146 @@ The `pages/api` directory is mapped to `/api/*`. Files in this directory are tre
 
 This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
-## Learn More
+## Axios
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Getting Started
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```shell
+yarn add axios
+```
 
-## Deploy on Vercel
+#### Statically rendered page using getStaticProps
+```typescript
+// pages/beers/index.tsx
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+import axios from 'axios'
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+const BeersPage = ({ beers }: BeersPageProps) => {
+  return (
+    <>
+      <h1>Beers Page</h1>
+      <h3>Beers</h3>
+      {beers.map(beer => <p key={beer.id}>{beer.name}</p>)}
+    </>
+  )
+}
+
+export const getStaticProps = async () => {
+  const url = 'https://api.punkapi.com/v2/beers';
+  let beers: Beer[] = [];
+
+  try {
+    const res = await axios.get(url)
+    console.log({ res })
+    beers = res.data
+  } catch (error) {
+    console.error({ error })
+  }
+
+  return {
+    props: {
+      beers,
+    },
+  }
+}
+```
+
+#### Requests for dynamic data in useEffect
+
+> Doesn't handle aborting requests
+
+```typescript
+// pages/beers/index.tsx
+
+import axios from 'axios';
+
+const BeersPage = ({ beers }: BeersPageProps) => {
+  const [loading, setLoading] = useState(false);
+  const [featuredBeer, setFeaturedBeer] = useState<Beer | undefined>(undefined)
+  console.log({ beers })
+
+  useEffect(() => {
+    console.log("useEffect")
+    const url = 'https://api.punkapi.com/v2/beers/1';
+    setLoading(true);
+
+    axios.get(url).then(res => {
+      const beer = res.data[0];
+      console.log("setting featured beer to: ", {beer})
+      setFeaturedBeer(beer);
+      setLoading(false);
+    });
+  }, []);
+
+  const renderFeaturedBeer = () => {
+    if (loading) {
+      return <p>Loading...</p>
+    }
+
+    if (featuredBeer) {
+      return <p>Featured Beer: {featuredBeer.name}</p>
+    }
+
+    return <p>No featured beer found</p>
+  }
+
+  return (
+    <>
+      <h1>Beers Page</h1>
+      {renderFeaturedBeer()}
+    </>
+  )
+}
+```
+
+#### Requests for dynamic data using custom useAxios hook
+
+> Doesn't handle aborting requests
+
+```typescript
+// with useAxios hook
+// pages/beers/index.tsx
+
+const BeersPage = ({ beers }: BeersPageProps) => {
+  const API_URL = 'https://api.punkapi.com/v2/beers/1';
+
+  console.log({ staticBeers: beers })
+
+  const { data: dynamicData, loaded } = useAxios<Beer[]>({ url: API_URL });
+
+  console.log({ featuredBeer: dynamicData })
+
+  const renderFeaturedBeer = () => {
+    if (!loaded) {
+      return <p>Loading...</p>
+    }
+
+    if (dynamicData?.length && dynamicData[0]?.name) {
+      return <p>Featured Beer: {dynamicData[0].name}</p>
+    }
+
+    return <p>No featured beer found</p>
+  }
+
+  return (
+    <>
+      <h1>Beers Page</h1>
+      {renderFeaturedBeer()}
+      <h3>Beers</h3>
+      {beers.map(beer => <p key={beer.id}>{beer.name}</p>)}
+    </>
+  )
+}
+```
+
+#### Comments
+
+Axios is nice and simple to get going with. The syntax is straightforward and can be used with `async/await` or .`then`.
+
+For a library like this it might make sense to have a custom hook that makes it even easier to work with rather that writing requests in useEffects.
+
+**Request Cancellation:** https://axios-http.com/docs/cancellation
+One thing I noticed is that duplicated requests aren't cancelled automatically for us so we would need to use AbortController. CancelToken is now deprecated.
+
+We might also solve this using GSM. If the data is there then don't re-request it for a short time.

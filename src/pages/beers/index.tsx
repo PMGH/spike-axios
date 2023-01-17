@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import useAxios from 'hooks/useAxios';
+import { useEffect, useRef, useState } from 'react';
 
 type Beer = {
   id: string;
@@ -11,30 +12,21 @@ type BeersPageProps = {
 }
 
 const BeersPage = ({ beers }: BeersPageProps) => {
-  const [loading, setLoading] = useState(false);
-  const [featuredBeer, setFeaturedBeer] = useState<Beer | undefined>(undefined)
-  console.log({ beers })
+  const API_URL = 'https://api.punkapi.com/v2/beers/1';
 
-  useEffect(() => {
-    console.log("useEffect")
-    const url = 'https://api.punkapi.com/v2/beers/1';
-    setLoading(true);
+  console.log({ staticBeers: beers })
 
-    axios.get(url).then(res => {
-      const beer = res.data[0];
-      console.log("setting featured beer to: ", {beer})
-      setFeaturedBeer(beer);
-      setLoading(false);
-    });
-  }, []);
+  const { data: dynamicData, loaded } = useAxios<Beer[]>({ url: API_URL });
+
+  console.log({ featuredBeer: dynamicData })
 
   const renderFeaturedBeer = () => {
-    if (loading) {
+    if (!loaded) {
       return <p>Loading...</p>
     }
 
-    if (featuredBeer) {
-      return <p>Featured Beer: {featuredBeer.name}</p>
+    if (dynamicData?.length && dynamicData[0]?.name) {
+      return <p>Featured Beer: {dynamicData[0].name}</p>
     }
 
     return <p>No featured beer found</p>
